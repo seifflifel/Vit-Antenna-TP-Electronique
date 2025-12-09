@@ -1,0 +1,41 @@
+*.npy
+*.mat
+*.pth
+*.pkl
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+env/
+*.log
+.DS_Store
+*.swp
+*.swo
+*~
+
+# Large data files
+images/
+*.npy
+Minput*
+Moutput*
+
+# PyTorch/model checkpoints
+vit_*.pth
+*_checkpoint.pth
+ffnn_model.pth
+
+# Matplotlib/plots
+*.png
+vit_training_loss.png
+vit_test_comparison.png
+
+# IDE
+.vscode/
+.idea/
+*.code-workspace
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
