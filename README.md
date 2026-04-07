@@ -132,18 +132,11 @@ python ViT_training.py --resume
 python ViT_test.py
 ```
 
-## Screenshots
-
-The project can generate visual outputs automatically during training and testing:
-
-- `vit_training_loss.png`
-- `vit_test_comparison.png`
-- sample polar images in `images/`
-
-Current repository policy keeps generated PNG files out of version control.
-If you want screenshots visible on GitHub, add manually curated images under a dedicated tracked folder (for example `docs/screenshots/`) and reference them in this README.
 
 ## Notes
 
 - `ViT_test.py` can run without a checkpoint, but predictions will be random if no trained model exists.
-- Generated data and model files are local artifacts and should be recreated when needed.
+- This project was an introduction to machine learning and artificial intelligence in an electronics class at INSAT IIA3 course.
+
+## Date & Context
+Project Date: December 2025 Project Context: Function of electronics project for IIA3 at INSAT
