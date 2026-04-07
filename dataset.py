@@ -15,17 +15,9 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 import matplotlib
 matplotlib.use("Agg")   # prevents plots from popping up
 
-### Affichage visuel de démarcation (alternative à l'effacement console)
-def clear_console(): 
-    print("\n" + "="*80 + "\n" + " "*30 + "NOUVELLE EXÉCUTION\n" + "="*80 + "\n")
-
-# Appel immédiat au début du script
-clear_console()
 
 
-
-# === Paramètres modifiables ===
-nb_samples = 100
+nb_samples = 10000
 max_rings = 5
 max_elements = 10
 theta0_max_deg = 180
@@ -36,20 +28,16 @@ k = 2 * np.pi / lambda_
 r0 = 0.2 * lambda_
 delta_r = 0.5 * lambda_
 np.random.seed(46) 
-# === Initialisation des matrices ===
 
-Moutput = np.zeros((max_rings, nb_samples))  # Architecture
-Minput = np.zeros((4, nb_samples))           # [MainLobe, SSL, HPBW, theta0]
-image_h = 240
-image_w = 240
-# Create folder for images
+Moutput = np.zeros((max_rings, nb_samples))
+Minput = np.zeros((4, nb_samples))
+image_h = 224
+image_w = 224
 images_dir = os.path.join(script_dir, "images")
 os.makedirs(images_dir, exist_ok=True)
 Minput_images = np.zeros((nb_samples, image_h, image_w, 3), dtype=np.uint8)
-# also store polar versions (same shape)
 Minput_images_polar = np.zeros((nb_samples, image_h, image_w, 3), dtype=np.uint8)
 
-# === Boucle principale ===
 for sample_idx in range(nb_samples):
     
     # --- Architecture complètement aléatoire ---
@@ -59,15 +47,12 @@ for sample_idx in range(nb_samples):
             break
     Moutput[:, sample_idx] = elements_per_ring
 
-    # --- Theta0 aléatoire ---
     theta0deg = np.random.uniform(0, theta0_max_deg)
     theta0 = np.deg2rad(theta0deg)
     phi0 = 0
 
-    # --- Rayons des anneaux ---
     radii = r0 + delta_r * np.arange(max_rings)
 
-    # --- Diagramme 2D ---
     theta = np.linspace(0, 2 * np.pi, 1000)
     phi = 0
     AF_az = np.zeros_like(theta, dtype=complex)
@@ -85,69 +70,57 @@ for sample_idx in range(nb_samples):
 
     AF_norm_az = np.abs(AF_az) / (np.max(np.abs(AF_az)) + np.finfo(float).eps)
     AF_dB_az = 20 * np.log10(AF_norm_az + np.finfo(float).eps)
-    
-    # Apply clipping first
     AF_dB_az[AF_dB_az < -40] = -40
     
-    # Compute theta_deg BEFORE plotting
     theta_deg = np.rad2deg(theta)
 
-    # === GENERATE POLAR RADIATION PATTERN IMAGE ===
     try:
-        # Use normalized linear AF for polar radii (must be >= 0). AF_norm_az is in [0,1].
         r = AF_norm_az
 
-        # Create polar figure with white background and no tick labels
         fig_polar = plt.figure(figsize=(3, 3), dpi=80, facecolor='white')
         ax = fig_polar.add_subplot(111, projection='polar', facecolor='white')
-        # theta is already in radians
         ax.plot(theta, r, linewidth=2, color='C0')
-        # radial limits must be non-negative
         ax.set_ylim([0, 1])
-        # remove tick labels and grid for a clean image
         ax.set_yticklabels([])
         ax.set_xticklabels([])
         ax.grid(False)
-        # tidy the polar appearance for a clean image: hide labels, grid and polar frame
         ax.set_yticklabels([])
         ax.set_xticklabels([])
         ax.grid(False)
-        # remove the circular frame/spine so there is no visible circle border
         try:
             ax.spines['polar'].set_visible(False)
         except Exception:
-            # older/backends may not expose polar spine the same way — fall back to hiding frame
             ax.set_frame_on(False)
         fig_polar.canvas.draw()
         buf_p = fig_polar.canvas.buffer_rgba()
         img_rgba_p = np.asarray(buf_p, dtype=np.uint8)
         img_rgba_p = img_rgba_p.reshape(fig_polar.canvas.get_width_height()[::-1] + (4,))
         img_polar = img_rgba_p[:, :, :3]
+        img_polar = Image.fromarray(img_polar).resize((image_w, image_h))
+        img_polar = np.array(img_polar)
         plt.close(fig_polar)
 
         Minput_images_polar[sample_idx] = img_polar
 
-        # save polar image to disk
         img_pil_p = Image.fromarray(img_polar)
         img_filename_p = os.path.join(images_dir, f"sample_{sample_idx:03d}_polar.png")
         img_pil_p.save(img_filename_p)
     except Exception as e:
-        print(f"Warning: failed to create/save polar image for sample {sample_idx}: {e}")
+        pass
     #calcul du gain max non normalisé du lobe principale
     AF_abs_az = np.abs(AF_az)
     maxVal = np.max(AF_abs_az)
     maxVal_non_norm = 20 * np.log10(maxVal + np.finfo(float).eps)
     
-    # --- HPBW ---
     maxVal_dB = np.max(AF_dB_az)
     maxIdx = np.argmax(AF_dB_az)
     halfPower = maxVal_dB - 3
-    AF_dB_ext = np.concatenate((AF_dB_az, AF_dB_az, AF_dB_az))# 
-    theta_deg_ext = np.concatenate((theta_deg - 360, theta_deg, theta_deg + 360))# 
-    maxIdx_ext = maxIdx + len(theta_deg)#
+    AF_dB_ext = np.concatenate((AF_dB_az, AF_dB_az, AF_dB_az))
+    theta_deg_ext = np.concatenate((theta_deg - 360, theta_deg, theta_deg + 360))
+    maxIdx_ext = maxIdx + len(theta_deg)
     
     leftIdx_ext = np.where(AF_dB_ext[:maxIdx_ext] <= halfPower)[0][-1] if np.any(
-        AF_dB_ext[:maxIdx_ext] <= halfPower) else None #
+        AF_dB_ext[:maxIdx_ext] <= halfPower) else None
     
     rightIdx_ext = np.where(AF_dB_ext[maxIdx_ext:] <= halfPower)[0]
     
@@ -159,20 +132,19 @@ for sample_idx in range(nb_samples):
     else:
         HPBW = theta_deg_ext[rightIdx_ext] - theta_deg_ext[leftIdx_ext]
 
-    # --- Gain lobe principal & SSL ---
-    responseLin = AF_norm_az#
+    responseLin = AF_norm_az
     peaks, _ = find_peaks(responseLin, distance=5)
     
-    pk = responseLin[peaks]#
-    if len(pk) == 0:#
-        main_lobe_gain = maxVal_non_norm # 
-        true_SSL_gain = 0# 
+    pk = responseLin[peaks]
+    if len(pk) == 0:
+        main_lobe_gain = maxVal_non_norm
+        true_SSL_gain = 0
     else: 
-        sorted_idx = np.argsort(pk)[::-1]#
-        sorted_pk = pk[sorted_idx]#
-        sorted_angles = theta_deg[peaks][sorted_idx]#
+        sorted_idx = np.argsort(pk)[::-1]
+        sorted_pk = pk[sorted_idx]
+        sorted_angles = theta_deg[peaks][sorted_idx]
 
-        threshold_dB = 1#
+        threshold_dB = 1
         main_lobes_idx = np.where(
             20 * np.log10(sorted_pk + np.finfo(float).eps) >=
             20 * np.log10(sorted_pk[0] + np.finfo(float).eps) - threshold_dB)[0]#
@@ -188,19 +160,7 @@ for sample_idx in range(nb_samples):
     Minput[0, sample_idx] = main_lobe_gain
     Minput[1, sample_idx] = true_SSL_gain
     Minput[2, sample_idx] = HPBW
-    Minput[3, sample_idx] = theta0deg
-    
-    
-# === Affichage d'une partie du Minput et Moutput ===
-print("\nCaractéristiques de la matrice Minput :")
-print(f"- Shape (lignes, colonnes) : {Minput.shape}")
-print("→ Premières colonnes (extraits) :")
-print(np.round(Minput[:, :5], 4))  
-
-print("\nCaractéristiques de la matrice Moutput :")
-print(f"- Shape (lignes, colonnes) : {Moutput.shape}")
-print("→ Premières colonnes (extraits) :")
-print(Moutput[:, :5].astype(int))  
+    Minput[3, sample_idx] = theta0deg  
 
 
 

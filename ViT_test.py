@@ -4,19 +4,11 @@ import numpy as np
 import os
 import matplotlib.pyplot as plt
 from scipy.signal import find_peaks
-from ViT_training import ViTMultiHead  # Import model class
-
-### Affichage visuel de démarcation
-def clear_console(): 
-    print("\n" + "="*80 + "\n" + " "*30 + "NOUVELLE EXÉCUTION\n" + "="*80 + "\n")
-
-clear_console()
+from ViT_training import ViTMultiHead  # Updated import
 
 # === Setup ===
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 script_dir = os.path.dirname(os.path.abspath(__file__))
-
-print(f"Using device: {DEVICE}")
 
 # === Antenna Parameters (must match dataset.py) ===
 carrierFreq = 2.45e9
@@ -28,35 +20,24 @@ delta_r = 0.5 * lambda_
 max_rings = 5
 
 # === Load Test Data ===
-print("\nLoading test data...")
-test_images = np.load(os.path.join(script_dir, 'Minput_images_polar_test.npy'))  # (15, 240, 240, 3)
+test_images = np.load(os.path.join(script_dir, 'Minput_images_polar_test.npy'))  # (~525, 224, 224, 3)
 test_targets = np.load(os.path.join(script_dir, 'Moutput_test.npy')).T  # (15, 5)
 test_features = np.load(os.path.join(script_dir, 'Minput_test.npy')).T  # (15, 4)
 
-print(f"  Test images: {test_images.shape}")
-print(f"  Test targets: {test_targets.shape}")
-print(f"  Test features: {test_features.shape}")
-
 # === Load Model ===
-print("\nLoading trained ViT model...")
-model = ViTMultiHead(num_rings=5, num_classes_per_ring=11, pretrained=False).to(DEVICE)
+model = ViTMultiHead(num_rings=5, num_classes_per_ring=11, pretrained=False, dropout_rate=0.5).to(DEVICE)  # Added dropout_rate
 
-model_path = os.path.join(script_dir, 'vit_best_model.pth')
+model_path = os.path.join(script_dir, 'best_vit_antenna_model.pth')
 if os.path.exists(model_path):
     model.load_state_dict(torch.load(model_path, map_location=DEVICE))
-    print(f"✓ Loaded model from {model_path}")
 else:
-    print(f"⚠ Model not found at {model_path}. Using random initialization.")
-    print("  Make sure ViT_training.py has finished successfully.")
+    print(f"Model not found at {model_path}. Using random initialization.")
 
 model.eval()
 
 # === Antenna Pattern Calculation ===
 def calculate_radiation_pattern(elements_per_ring, theta0deg):
-    """
-    Compute radiation pattern metrics for given antenna architecture.
-    Returns: AF_dB_az, HPBW, main_lobe_gain_dB, SSL_gain_dB
-    """
+    
     theta0 = np.deg2rad(theta0deg)
     phi0 = 0
     phi = 0
@@ -124,9 +105,6 @@ def calculate_radiation_pattern(elements_per_ring, theta0deg):
 
 
 # === Inference & Evaluation ===
-print("\n" + "="*80)
-print("Running inference on test set...")
-print("="*80 + "\n")
 
 all_accuracies = []
 per_ring_accuracies = [[] for _ in range(5)]
@@ -163,18 +141,14 @@ with torch.no_grad():
 overall_acc = np.mean(all_accuracies) * 100
 per_ring_acc = [np.mean(accs) * 100 for accs in per_ring_accuracies]
 
-print("\n" + "="*80)
 print("Evaluation Results")
-print("="*80)
-print(f"\nOverall Accuracy (all rings correct): {overall_acc:.2f}%")
-print(f"Per-ring Accuracy:")
+print(f"Overall Accuracy (all rings correct): {overall_acc:.2f}%")
+print("Per-ring Accuracy:")
 for ring in range(5):
     print(f"  Ring {ring+1}: {per_ring_acc[ring]:.2f}%")
 
 # === Detailed Comparison for First Sample ===
-print("\n" + "="*80)
 print("Detailed Results for Test Sample 0")
-print("="*80)
 
 sample_idx = 0
 theta0deg = test_features[sample_idx, 3]
